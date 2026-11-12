@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Clasificador Inteligente de Residuos - Arquitectura Serverless con S3, Lambda, Rekognition, DynamoDB y API Gateway.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 15
+    MemorySize: 256
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        BUCKET: !Sub "${AWS::StackName}-imagenes-${AWS::AccountId}"
+        TABLE: !Ref ResiduosTable
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # API Gateway con CORS habilitado
+  # ---------------------------------------------------------------------------
+  ClasificadorApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,PUT,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+  # ---------------------------------------------------------------------------
+  # Bucket S3 para almacenar las fotos temporalmente (con CORS para PUT directo)
+  # ---------------------------------------------------------------------------
+  ImagenesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-imagenes-${AWS::AccountId}"
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - PUT
+              - GET
+              - HEAD
+            AllowedOrigins:
+              - "*"
+            MaxAge: 3000
+      LifecycleConfiguration:
+        Rules:
+          - Id: EliminarFotosAntiguas
+            Status: Enabled
+            Prefix: uploads/
+            ExpirationInDays: 1
+
+  # ---------------------------------------------------------------------------
+  # Tabla DynamoDB para resultados de clasificacion (Always Free Tier: <= 25 RCU/WCU)
+  # ---------------------------------------------------------------------------
+  ResiduosTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-residuos"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions:
+        - AttributeName: imagen_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: imagen_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # ---------------------------------------------------------------------------
+  # Lambda #1: Genera URL prefirmada para subir foto a S3 (POST /subir)
+  # ---------------------------------------------------------------------------
+  PresignFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/
+      Handler: presign.lambda_handler
+      Description: Genera una URL prefirmada de S3 para subir la fotografia del residuo.
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Sub "${AWS::StackName}-imagenes-${AWS::AccountId}"
+      Events:
+        SubirApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClasificadorApi
+            Path: /subir
+            Method: post
+
+  # ---------------------------------------------------------------------------
+  # Lambda #2: Trigger S3 -> Rekognition -> Clasificacion -> DynamoDB
+  # ---------------------------------------------------------------------------
+  AnalizarFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/
+      Handler: analizar.lambda_handler
+      Timeout: 30
+      Description: Analiza la imagen subida a S3 con Rekognition y guarda la clasificacion en DynamoDB.
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Sub "${AWS::StackName}-imagenes-${AWS::AccountId}"
+        - DynamoDBWritePolicy:
+            TableName: !Ref ResiduosTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rekognition:DetectLabels
+              Resource: "*"
+      Events:
+        FotoSubidaEvent:
+          Type: S3
+          Properties:
+            Bucket: !Ref ImagenesBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+
+  # ---------------------------------------------------------------------------
+  # Lambda #3: Consulta el resultado en DynamoDB (GET /resultado?id=...)
+  # ---------------------------------------------------------------------------
+  ResultadoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/
+      Handler: resultado.lambda_handler
+      Description: Consulta el estado y resultado de clasificacion de una imagen en DynamoDB.
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ResiduosTable
+      Events:
+        ResultadoApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ClasificadorApi
+            Path: /resultado
+            Method: get
+
+Outputs:
+  ApiUrl:
+    Description: URL base de API Gateway para colocar en el frontend (index.html)
+    Value: !Sub "https://${ClasificadorApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  BucketName:
+    Description: Nombre del bucket S3 de imagenes
+    Value: !Ref ImagenesBucket
+  DynamoDBTableName:
+    Description: Nombre de la tabla DynamoDB
+    Value: !Ref ResiduosTable

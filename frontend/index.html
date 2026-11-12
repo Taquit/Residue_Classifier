@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Clasificador Inteligente de Residuos</title>
+  <style>
+    :root {
+      --bg: #f4f7f6;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #0f766e;
+      --primary-hover: #115e59;
+      --organico-bg: #ecfdf5;
+      --organico-border: #10b981;
+      --organico-text: #065f46;
+      --reciclable-bg: #eff6ff;
+      --reciclable-border: #3b82f6;
+      --reciclable-text: #1e40af;
+      --noreciclable-bg: #f1f5f9;
+      --noreciclable-border: #64748b;
+      --noreciclable-text: #334155;
+      --error-bg: #fef2f2;
+      --error-border: #ef4444;
+      --error-text: #991b1b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.25rem 1rem 2.5rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 1.25rem;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+
+    header p {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 1.25rem;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+      margin-bottom: 1rem;
+    }
+
+    .config-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .config-bar label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .config-bar input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.88rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .config-bar input:focus {
+      border-color: var(--primary);
+    }
+
+    .dropzone {
+      border: 2px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 1.75rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background-color 0.2s;
+      background-color: #f8fafc;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--primary);
+      background-color: #f0fdfa;
+    }
+
+    .dropzone svg {
+      width: 44px;
+      height: 44px;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .dropzone-title {
+      font-weight: 600;
+      font-size: 0.98rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .dropzone-sub {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background-color 0.15s, opacity 0.15s;
+      width: 100%;
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background-color: #ffffff;
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background-color: #f1f5f9;
+    }
+
+    .preview-wrapper {
+      display: none;
+      margin-top: 1rem;
+      text-align: center;
+    }
+
+    .preview-wrapper.active {
+      display: block;
+    }
+
+    .preview-img {
+      max-width: 100%;
+      max-height: 280px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      object-fit: contain;
+      background: #0f172a;
+    }
+
+    .analyze-btn-wrap {
+      margin-top: 0.85rem;
+    }
+
+    .status-box {
+      display: none;
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 0.92rem;
+    }
+
+    .status-box.active {
+      display: block;
+    }
+
+    .status-loading {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--muted);
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid #cbd5e1;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .result-card {
+      display: none;
+      border-radius: 12px;
+      padding: 1.25rem;
+      border: 2px solid transparent;
+      margin-top: 1rem;
+    }
+
+    .result-card.active {
+      display: block;
+    }
+
+    .result-card.organico {
+      background-color: var(--organico-bg);
+      border-color: var(--organico-border);
+      color: var(--organico-text);
+    }
+
+    .result-card.reciclable {
+      background-color: var(--reciclable-bg);
+      border-color: var(--reciclable-border);
+      color: var(--reciclable-text);
+    }
+
+    .result-card.no_reciclable {
+      background-color: var(--noreciclable-bg);
+      border-color: var(--noreciclable-border);
+      color: var(--noreciclable-text);
+    }
+
+    .result-card.error {
+      background-color: var(--error-bg);
+      border-color: var(--error-border);
+      color: var(--error-text);
+    }
+
+    .result-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.75);
+      margin-bottom: 0.5rem;
+    }
+
+    .result-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .result-confidence {
+      font-size: 0.9rem;
+      margin-bottom: 0.85rem;
+      opacity: 0.9;
+    }
+
+    .tags-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+      opacity: 0.85;
+    }
+
+    .tags-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .tag {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      font-weight: 500;
+    }
+
+    .bins-legend {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .bin-item {
+      padding: 0.65rem 0.5rem;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+    }
+
+    .bin-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 480px) {
+      .action-buttons {
+        grid-template-columns: 1fr;
+      }
+      .bins-legend {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Clasificador Inteligente de Residuos</h1>
+      <p>Toma una foto desde tu celular o sube una imagen desde tu computadora</p>
+    </header>
+
+    <div class="card">
+      <div class="config-bar">
+        <label for="apiUrl">URL base de API Gateway</label>
+        <input
+          type="url"
+          id="apiUrl"
+          placeholder="https://xxxx.execute-api.us-east-1.amazonaws.com/prod"
+          autocomplete="off"
+        />
+      </div>
+
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Seleccionar o arrastrar imagen">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+        <div class="dropzone-title">Arrastra una imagen aqui o usa los botones</div>
+        <div class="dropzone-sub">Formatos compatibles: JPG, PNG (optimizacion automatica)</div>
+      </div>
+
+      <!-- Inputs ocultos para galeria/archivo y camara directa en movil -->
+      <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden />
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden />
+
+      <div class="action-buttons">
+        <button type="button" id="btnCamera" class="btn btn-secondary">
+          Tomar foto (Camara)
+        </button>
+        <button type="button" id="btnFile" class="btn btn-secondary">
+          Elegir archivo / Galeria
+        </button>
+      </div>
+
+      <div id="previewWrapper" class="preview-wrapper">
+        <img id="previewImg" class="preview-img" alt="Vista previa del residuo" />
+        <div class="analyze-btn-wrap">
+          <button type="button" id="btnAnalyze" class="btn btn-primary">
+            Clasificar residuo
+          </button>
+        </div>
+      </div>
+
+      <div id="statusBox" class="status-box">
+        <div class="status-loading">
+          <div class="spinner"></div>
+          <span id="statusText">Subiendo imagen...</span>
+        </div>
+      </div>
+
+      <div id="resultCard" class="result-card">
+        <span id="resultBadge" class="result-badge">Resultado</span>
+        <div id="resultTitle" class="result-title"></div>
+        <div id="resultConfidence" class="result-confidence"></div>
+        <div id="tagsSection">
+          <div class="tags-title">Etiquetas detectadas por Rekognition</div>
+          <div id="tagsList" class="tags-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tags-title" style="margin-bottom: 0.5rem;">Referencia de separacion</div>
+      <div class="bins-legend">
+        <div class="bin-item">
+          <span class="bin-dot" style="background:#10b981;"></span>Organico (Verde)
+        </div>
+        <div class="bin-item">
+          <span class="bin-dot" style="background:#3b82f6;"></span>Reciclable (Azul)
+        </div>
+        <div class="bin-item">
+          <span class="bin-dot" style="background:#64748b;"></span>No Reciclable (Gris)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = "clasificador_residuos_api_url";
+      const apiUrlInput = document.getElementById("apiUrl");
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("fileInput");
+      const cameraInput = document.getElementById("cameraInput");
+      const btnCamera = document.getElementById("btnCamera");
+      const btnFile = document.getElementById("btnFile");
+      const btnAnalyze = document.getElementById("btnAnalyze");
+      const previewWrapper = document.getElementById("previewWrapper");
+      const previewImg = document.getElementById("previewImg");
+      const statusBox = document.getElementById("statusBox");
+      const statusText = document.getElementById("statusText");
+      const resultCard = document.getElementById("resultCard");
+      const resultBadge = document.getElementById("resultBadge");
+      const resultTitle = document.getElementById("resultTitle");
+      const resultConfidence = document.getElementById("resultConfidence");
+      const tagsSection = document.getElementById("tagsSection");
+      const tagsList = document.getElementById("tagsList");
+
+      let preparedBlob = null;
+
+      // Cargar URL guardada o parametro ?api=
+      const urlParams = new URLSearchParams(window.location.search);
+      const savedUrl = urlParams.get("api") || localStorage.getItem(STORAGE_KEY) || "";
+      if (savedUrl) {
+        apiUrlInput.value = savedUrl;
+      }
+      apiUrlInput.addEventListener("change", () => {
+        localStorage.setItem(STORAGE_KEY, apiUrlInput.value.trim().replace(/\/+$/, ""));
+      });
+
+      function getBaseApiUrl() {
+        const val = apiUrlInput.value.trim().replace(/\/+$/, "");
+        if (val) {
+          localStorage.setItem(STORAGE_KEY, val);
+        }
+        return val;
+      }
+
+      // Comprime y normaliza cualquier imagen a JPEG (max 1280px) para envio rapido desde celular o laptop
+      function normalizeImageToJpeg(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error("No se pudo leer el archivo seleccionado."));
+          reader.onload = (e) => {
+            const img = new Image();
+            img.onerror = () => reject(new Error("El archivo no es una imagen valida."));
+            img.onload = () => {
+              const MAX_DIM = 1280;
+              let width = img.width;
+              let height = img.height;
+              if (width > MAX_DIM || height > MAX_DIM) {
+                if (width > height) {
+                  height = Math.round((height * MAX_DIM) / width);
+                  width = MAX_DIM;
+                } else {
+                  width = Math.round((width * MAX_DIM) / height);
+                  height = MAX_DIM;
+                }
+              }
+              const canvas = document.createElement("canvas");
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d");
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(img, 0, 0, width, height);
+              canvas.toBlob(
+                (blob) => {
+                  if (!blob) {
+                    reject(new Error("Error al procesar la imagen."));
+                    return;
+                  }
+                  resolve({ blob, dataUrl: canvas.toDataURL("image/jpeg", 0.85) });
+                },
+                "image/jpeg",
+                0.85
+              );
+            };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function handleFileSelected(file) {
+        if (!file) return;
+        resultCard.className = "result-card";
+        try {
+          const { blob, dataUrl } = await normalizeImageToJpeg(file);
+          preparedBlob = blob;
+          previewImg.src = dataUrl;
+          previewWrapper.classList.add("active");
+        } catch (err) {
+          showError(err.message || "Archivo no compatible.");
+        }
+      }
+
+      btnCamera.addEventListener("click", () => cameraInput.click());
+      btnFile.addEventListener("click", () => fileInput.click());
+      dropzone.addEventListener("click", () => fileInput.click());
+
+      fileInput.addEventListener("change", (e) => handleFileSelected(e.target.files[0]));
+      cameraInput.addEventListener("change", (e) => handleFileSelected(e.target.files[0]));
+
+      dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+      dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("dragover");
+      });
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          handleFileSelected(e.dataTransfer.files[0]);
+        }
+      });
+
+      function setStatus(message) {
+        if (!message) {
+          statusBox.classList.remove("active");
+          return;
+        }
+        statusText.textContent = message;
+        statusBox.classList.add("active");
+      }
+
+      function showError(msg) {
+        setStatus(null);
+        resultCard.className = "result-card active error";
+        resultBadge.textContent = "Error";
+        resultTitle.textContent = "No se pudo completar la clasificacion";
+        resultConfidence.textContent = msg;
+        tagsSection.style.display = "none";
+      }
+
+      function showResult(data) {
+        setStatus(null);
+        const cat = data.categoria || "no_reciclable";
+        resultCard.className = "result-card active " + cat;
+        resultBadge.textContent = cat.replace("_", " ");
+        resultTitle.textContent = data.bote || "Clasificacion completada";
+        resultConfidence.textContent = "Indice de confianza: " + (data.confianza ?? 0) + "%";
+
+        tagsList.innerHTML = "";
+        const detalle = data.etiquetas_detalle || [];
+        const simples = data.etiquetas || [];
+
+        if (detalle.length > 0) {
+          tagsSection.style.display = "block";
+          detalle.forEach((item) => {
+            const span = document.createElement("span");
+            span.className = "tag";
+            span.textContent = item.nombre + " (" + item.confianza + "%)";
+            tagsList.appendChild(span);
+          });
+        } else if (simples.length > 0) {
+          tagsSection.style.display = "block";
+          simples.forEach((nombre) => {
+            const span = document.createElement("span");
+            span.className = "tag";
+            span.textContent = nombre;
+            tagsList.appendChild(span);
+          });
+        } else {
+          tagsSection.style.display = "none";
+        }
+      }
+
+      async function pollResult(baseUrl, imagenId) {
+        const maxAttempts = 20;
+        const delayMs = 1500;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          setStatus("Analizando residuo con AWS Rekognition (" + attempt + "/" + maxAttempts + ")...");
+          await new Promise((r) => setTimeout(r, delayMs));
+
+          const resp = await fetch(baseUrl + "/resultado?id=" + encodeURIComponent(imagenId));
+          if (!resp.ok) {
+            throw new Error("Error al consultar el resultado (HTTP " + resp.status + ").");
+          }
+          const data = await resp.json();
+          if (data.estado === "listo") {
+            return data;
+          }
+          if (data.estado === "error") {
+            throw new Error(data.error || "Error durante el analisis de la imagen.");
+          }
+        }
+        throw new Error("El analisis tardo demasiado tiempo. Verifica que el trigger S3 de la funcion Lambda 'analizar' este activo.");
+      }
+
+      btnAnalyze.addEventListener("click", async () => {
+        const baseUrl = getBaseApiUrl();
+        if (!baseUrl) {
+          showError("Ingresa primero la URL base de tu API Gateway en el campo superior.");
+          apiUrlInput.focus();
+          return;
+        }
+        if (!preparedBlob) {
+          showError("Selecciona o toma una foto antes de clasificar.");
+          return;
+        }
+
+        btnAnalyze.disabled = true;
+        resultCard.className = "result-card";
+
+        try {
+          setStatus("Solicitando URL segura de subida...");
+          const presignResp = await fetch(baseUrl + "/subir", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content_type: "image/jpeg" }),
+          });
+
+          if (!presignResp.ok) {
+            const errData = await presignResp.json().catch(() => ({}));
+            throw new Error(errData.error || "Error en POST /subir (HTTP " + presignResp.status + ")");
+          }
+
+          const { imagen_id, upload_url, content_type } = await presignResp.json();
+          if (!upload_url || !imagen_id) {
+            throw new Error("Respuesta incompleta del endpoint /subir.");
+          }
+
+          setStatus("Subiendo fotografia a Amazon S3...");
+          const uploadResp = await fetch(upload_url, {
+            method: "PUT",
+            headers: { "Content-Type": content_type || "image/jpeg" },
+            body: preparedBlob,
+          });
+
+          if (!uploadResp.ok) {
+            throw new Error("Error al subir la imagen a S3 (HTTP " + uploadResp.status + "). Revisa la configuracion CORS del bucket.");
+          }
+
+          const finalData = await pollResult(baseUrl, imagen_id);
+          showResult(finalData);
+        } catch (err) {
+          showError(err.message || "Ocurrio un error inesperado.");
+        } finally {
+          btnAnalyze.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
