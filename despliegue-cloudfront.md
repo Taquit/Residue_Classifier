@@ -25,6 +25,20 @@ Esta guia describe el proceso para desplegar el Clasificador Inteligente de Resi
 
 ---
 
+## Verificacion de AWS Free Tier (Cuentas Nuevas)
+
+Esta arquitectura completa (incluyendo CloudFront) es **100% compatible con la capa gratuita de AWS (AWS Free Tier)** al crear una cuenta nueva:
+
+- **Amazon CloudFront (Always Free - Permanente):** Incluye gratis **1 TB de transferencia de datos de salida** y **10,000,000 de solicitudes HTTP/HTTPS** al mes de forma indefinida.
+- **AWS Lambda (Always Free - Permanente):** Incluye gratis 1,000,000 de invocaciones y 400,000 GB-segundos al mes de forma indefinida.
+- **Amazon DynamoDB (Always Free - Permanente):** Incluye gratis 25 GB de almacenamiento, 25 RCU y 25 WCU al mes de forma indefinida **unicamente en modo Aprovisionado (Provisioned)**. Por ello, se configura con 5 RCU y 5 WCU sin Auto Scaling (en lugar de modo On-Demand).
+- **Amazon CloudWatch Logs (Always Free - Permanente):** Incluye gratis 5 GB de logs al mes.
+- **Amazon Rekognition, Amazon S3 y API Gateway:**
+  - **Cuentas nuevas (creadas desde el 15 de julio de 2025):** Cubiertos por los **hasta $200 USD en creditos** (6 meses) del **Free Plan** o **Paid Plan** ($100 USD al registrarse + hasta $100 USD al completar actividades iniciales). En el *Free Plan*, AWS bloquea cualquier cargo a tu tarjeta. Analizar 1,000 imagenes con `DetectLabels` consume solo $1.00 USD de ese credito gratuito.
+  - **Cuentas Legacy (anteriores al 15 de julio de 2025):** Cubiertos durante los primeros 12 meses (1,000 imagenes/mes en Rekognition Grupo 2, 5 GB y 2,000 PUT en S3, y 1,000,000 de llamadas REST en API Gateway).
+
+---
+
 ## Fase 1: Despliegue del Backend
 
 El backend se configura siguiendo los mismos pasos descritos en la guia de consola:
