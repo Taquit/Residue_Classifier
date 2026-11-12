@@ -16,9 +16,10 @@ logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3")
 BUCKET = os.environ.get("BUCKET", "")
+ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
 
 CORS = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
     "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
     "Content-Type": "application/json",

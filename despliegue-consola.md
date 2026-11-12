@@ -159,6 +159,7 @@ Cada funcion tiene su propio archivo independiente dentro de la carpeta `lambdas
 5. En la pestaña **Configuracion**:
    - En **Variables de entorno**, agrega:
      - `BUCKET`: Nombre de tu bucket de fotos.
+     - `ALLOWED_ORIGIN`: `*` (o la URL de tu frontend para restringir CORS).
    - En **Configuracion general**, edita el **Tiempo de espera (Timeout)** a **15 segundos**.
 
 ### 4.2. Lambda 2: `clasificador-analizar`
@@ -188,6 +189,7 @@ Cada funcion tiene su propio archivo independiente dentro de la carpeta `lambdas
 3. En la pestaña **Configuracion**:
    - **Variables de entorno**:
      - `TABLE`: `clasificador-residuos`
+     - `ALLOWED_ORIGIN`: `*` (o la URL de tu frontend para restringir CORS).
    - **Configuracion general**:
      - **Tiempo de espera (Timeout):** **15 segundos**.
 

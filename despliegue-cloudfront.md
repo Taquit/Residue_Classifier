@@ -48,14 +48,15 @@ El backend se configura siguiendo los mismos pasos descritos en la guia de conso
    - Habilitar TTL con el atributo `ttl`.
 2. **Bucket S3 de Fotos Temporales:**
    - Crear bucket privado (ej: `clasificador-fotos-[id]`).
-   - Configurar la regla CORS para metodos `PUT`, `GET`, `HEAD`.
+   - Configurar la regla CORS para metodos `PUT`, `GET`, `HEAD` (usa `*` durante la configuracion inicial o tu dominio HTTPS de CloudFront `https://d111111abcdef8.cloudfront.net` una vez creado en la Fase 3).
 3. **Rol IAM:**
    - Crear el rol `ClasificadorResiduosLambdaRole` para Lambda con `AWSLambdaBasicExecutionRole`, `AmazonRekognitionReadOnlyAccess` y politica inline para S3 y DynamoDB.
 4. **Funciones Lambda (carpeta `lambdas/`):**
-   - `clasificador-presign` (Codigo: `lambdas/presign.py`, Timeout: 15s, Variable `BUCKET`).
+   - `clasificador-presign` (Codigo: `lambdas/presign.py`, Timeout: 15s, Variables `BUCKET` y `ALLOWED_ORIGIN`).
    - `clasificador-analizar` (Codigo: `lambdas/analizar.py`, Timeout: 30s, Memoria: 256MB, Variables `BUCKET` y `TABLE`).
-   - `clasificador-resultado` (Codigo: `lambdas/resultado.py`, Timeout: 15s, Variable `TABLE`).
+   - `clasificador-resultado` (Codigo: `lambdas/resultado.py`, Timeout: 15s, Variables `TABLE` y `ALLOWED_ORIGIN`).
    - En cada funcion, pegar el codigo en `lambda_function.py` dejando el Handler por defecto (`lambda_function.lambda_handler`).
+   *(Nota: Puedes fijar `ALLOWED_ORIGIN` como `*` inicialmente y luego actualizarlo a tu dominio de CloudFront `https://[dist-id].cloudfront.net` al terminar la Fase 3).*
 5. **Trigger S3:**
    - Enlazar el bucket de fotos a `clasificador-analizar` para eventos `s3:ObjectCreated:*` con prefijo `uploads/`.
 6. **API Gateway:**

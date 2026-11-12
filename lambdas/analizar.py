@@ -37,9 +37,9 @@ ORGANICO = {
 RECICLABLE = {
     "Bottle", "Water Bottle", "Plastic Bottle", "Beer Bottle", "Wine Bottle",
     "Glass Bottle", "Can", "Tin", "Aluminium", "Aluminum Can", "Beverage Can",
-    "Soda Can", "Cardboard", "Carton", "Milk Carton", "Box", "Paper",
-    "Newspaper", "Magazine", "Book", "Document", "Glass", "Jar", "Mason Jar",
-    "Paper Bag", "Plastic", "Metal", "Steel", "Foil", "jug", "Container",
+    "Soda Can", "Cardboard", "Carton", "Milk Carton", "Box",
+    "Newspaper", "Magazine", "Book", "Document", "Jar", "Mason Jar",
+    "Paper Bag", "Jug", "jug",
 }
 
 NO_RECICLABLE = {
@@ -53,28 +53,33 @@ NO_RECICLABLE = {
     "Bandage", "Mask", "Glove", "Rubber", "Sponge", "Shoe", "Clothing",
 }
 
-MATERIALES_GENERICOS = {"Plastic", "Paper", "Cardboard", "Foil", "Metal", "Glass", "Container"}
+# Materiales genericos: solo aportan puntaje auxiliar si se detecta un objeto reciclable concreto
+MATERIALES_GENERICOS = {"Plastic", "Paper", "Foil", "Metal", "Glass", "Steel", "Container"}
 
 BOTES = {
     "organico": "Bote ORGANICO (verde)",
     "reciclable": "Bote INORGANICO RECICLABLE (azul)",
     "no_reciclable": "Bote INORGANICO NO RECICLABLE (gris)",
+    "no_identificado": "No se identifico un residuo clasificable (acerca o ilumina mejor el objeto)",
 }
 
 
 def clasificar(labels):
     """
-    Clasifica las etiquetas de Rekognition ponderando etiquetas directas y jerarquias padre,
-    evitando que etiquetas genericas de material opaquen objetos no reciclables.
+    Clasifica las etiquetas de Rekognition ponderando etiquetas directas y jerarquias padre.
+    Los materiales genericos (Plastic, Paper, Metal, Container) no activan 'reciclable' por si solos
+    para evitar falsos positivos con plasticos sucios o desechables de un solo uso.
+    Si ninguna etiqueta coincide con un residuo conocido, retorna ('no_identificado', 0.0).
     """
     if not labels:
-        return "no_reciclable", 0.0
+        return "no_identificado", 0.0
 
     puntos = {"organico": 0.0, "reciclable": 0.0, "no_reciclable": 0.0}
     max_conf = {"organico": 0.0, "reciclable": 0.0, "no_reciclable": 0.0}
 
     nombres_directos = {lb.get("Name", "") for lb in labels}
     hay_no_reciclable_especifico = bool(nombres_directos & NO_RECICLABLE)
+    hay_reciclable_concreto = bool(nombres_directos & RECICLABLE)
 
     for lb in labels:
         nombre = lb.get("Name", "")
@@ -87,14 +92,12 @@ def clasificar(labels):
             continue
 
         if nombre in RECICLABLE:
-            if hay_no_reciclable_especifico and nombre in MATERIALES_GENERICOS:
-                factor = 0.2
-            elif nombre in MATERIALES_GENERICOS:
-                factor = 1.0
-            else:
-                factor = 1.5
-            puntos["reciclable"] += confianza * factor
+            puntos["reciclable"] += confianza * 1.5
             max_conf["reciclable"] = max(max_conf["reciclable"], confianza)
+
+        elif nombre in MATERIALES_GENERICOS:
+            if hay_reciclable_concreto and not hay_no_reciclable_especifico:
+                puntos["reciclable"] += confianza * 0.3
 
         if nombre in ORGANICO:
             factor = 1.4 if nombre != "Food" else 1.1
@@ -106,16 +109,15 @@ def clasificar(labels):
                 puntos["no_reciclable"] += confianza * 0.5
                 max_conf["no_reciclable"] = max(max_conf["no_reciclable"], confianza * 0.85)
             elif p in RECICLABLE:
-                if not (hay_no_reciclable_especifico and p in MATERIALES_GENERICOS):
-                    puntos["reciclable"] += confianza * 0.35
-                    max_conf["reciclable"] = max(max_conf["reciclable"], confianza * 0.8)
+                puntos["reciclable"] += confianza * 0.35
+                max_conf["reciclable"] = max(max_conf["reciclable"], confianza * 0.8)
             elif p in ORGANICO:
                 puntos["organico"] += confianza * 0.35
                 max_conf["organico"] = max(max_conf["organico"], confianza * 0.8)
 
     total = sum(puntos.values())
     if total == 0:
-        return "no_reciclable", 0.0
+        return "no_identificado", 0.0
 
     categoria = max(puntos, key=puntos.get)
     proporcion = puntos[categoria] / total

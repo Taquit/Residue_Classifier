@@ -271,6 +271,12 @@
       color: var(--noreciclable-text);
     }
 
+    .result-card.no_identificado {
+      background-color: #fffbeb;
+      border-color: #f59e0b;
+      color: #92400e;
+    }
+
     .result-card.error {
       background-color: var(--error-bg);
       border-color: var(--error-border);
@@ -583,11 +589,19 @@
 
       function showResult(data) {
         setStatus(null);
-        const cat = data.categoria || "no_reciclable";
+        const cat = data.categoria || "no_identificado";
         resultCard.className = "result-card active " + cat;
-        resultBadge.textContent = cat.replace("_", " ");
-        resultTitle.textContent = data.bote || "Clasificacion completada";
-        resultConfidence.textContent = "Indice de confianza: " + (data.confianza ?? 0) + "%";
+        if (cat === "no_identificado") {
+          resultBadge.textContent = "No identificado";
+          resultTitle.textContent = data.bote || "No se identifico un residuo clasificable";
+          resultConfidence.textContent = (data.confianza && data.confianza > 0)
+            ? "Indice de confianza: " + data.confianza + "%"
+            : "No se detectaron patrones coincidentes con residuos organicos o inorganicos. Intenta enfocar o iluminar mejor el objeto.";
+        } else {
+          resultBadge.textContent = cat.replace("_", " ");
+          resultTitle.textContent = data.bote || "Clasificacion completada";
+          resultConfidence.textContent = "Indice de confianza: " + (data.confianza ?? 0) + "%";
+        }
 
         tagsList.innerHTML = "";
         const detalle = data.etiquetas_detalle || [];

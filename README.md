@@ -48,6 +48,7 @@ sequenceDiagram
 
 ```text
 .
+├── .env.example                 # Plantilla de variables de entorno (region, bucket, tabla, CORS, api)
 ├── frontend/
 │   └── index.html               # Interfaz web (HTML5, CSS3, JS Vanilla + compresion en cliente)
 ├── lambdas/
@@ -70,22 +71,24 @@ Aplicacion de pagina unica (SPA) sin dependencias externas ni paso de compilacio
 - Redimensiona y comprime la fotografia en el navegador (Canvas a JPEG) antes de enviarla a S3 para reducir el consumo de datos y acelerar la respuesta.
 - Sube el archivo directamente a Amazon S3 usando la URL prefirmada, evitando el limite de payload de API Gateway y Lambda.
 - Realiza consultas periodicas (*polling*) al endpoint `/resultado` hasta obtener el dictamen.
+- Maneja estados visuales dedicados para las tres categorias de residuos, asi como la tarjeta ambar de **"No identificado"** cuando la foto no contenga un residuo reconocible.
 
 ### 2. Funciones AWS Lambda (`lambdas/`)
 Cada funcion esta separada en un archivo independiente y autocontenido con punto de entrada estandar `lambda_handler(event, context)`:
 
 | Archivo | Endpoint / Evento | Rol / Accion principal | Variables de Entorno | Timeout recomendado |
 |---|---|---|---|---|
-| `lambdas/presign.py` | `POST /subir` (API Gateway) | Valida el tipo MIME (`image/jpeg`, `image/png`) y firma una URL temporal de 5 minutos para `s3:PutObject` en `uploads/{uuid}.{ext}`. | `BUCKET` | 15 seg |
+| `lambdas/presign.py` | `POST /subir` (API Gateway) | Valida el tipo MIME (`image/jpeg`, `image/png`) y firma una URL temporal de 5 minutos para `s3:PutObject` en `uploads/{uuid}.{ext}` con CORS parametrizable. | `BUCKET`, `ALLOWED_ORIGIN` | 15 seg |
 | `lambdas/analizar.py` | `s3:ObjectCreated:*` en `uploads/` | Invoca `rekognition.detect_labels`, ejecuta el algoritmo de ponderacion de residuos y guarda el resultado en DynamoDB con expiracion TTL de 24 horas. | `BUCKET`, `TABLE` | 30 seg |
-| `lambdas/resultado.py` | `GET /resultado?id={id}` (API Gateway) | Consulta la clave primaria `imagen_id` en DynamoDB y retorna el estado (`procesando`, `listo` o `error`) junto con el bote sugerido y etiquetas. | `TABLE` | 15 seg |
+| `lambdas/resultado.py` | `GET /resultado?id={id}` (API Gateway) | Consulta la clave primaria `imagen_id` en DynamoDB y retorna el estado (`procesando`, `listo` o `error`) junto con el bote sugerido y etiquetas con CORS parametrizable. | `TABLE`, `ALLOWED_ORIGIN` | 15 seg |
 
-### 3. Logica de Clasificacion (`lambdas/analizar.py`)
-El clasificador pondera las etiquetas devueltas por Amazon Rekognition en tres conjuntos:
-1. **Prioridad a objetos especificos no reciclables (`NO_RECICLABLE`):** Si Rekognition detecta un objeto como `Plastic Bag`, `Straw`, `Napkin` o `Styrofoam`, le otorga mayor peso (`x1.8`) y atenua drasticamente las etiquetas de materiales genericos (`Plastic`, `Paper`) para evitar clasificar una bolsa o servilleta sucia como reciclable.
-2. **Objetos reciclables (`RECICLABLE`):** Botellas (`Bottle`, `Plastic Bottle`, `Glass Bottle`), latas (`Can`, `Aluminum Can`), carton y papel limpio (`Cardboard`, `Carton`, `Box`).
-3. **Residuos organicos (`ORGANICO`):** Frutas, verduras, restos de comida, plantas y hojas (`Fruit`, `Vegetable`, `Food`, `Plant`, `Bread`, etc.).
-4. **Contexto jerarquico (`Parents`):** Evalua las categorias padre devueltas por Rekognition como respaldo secundario.
+### 3. Logica de Clasificacion Refinada (`lambdas/analizar.py`)
+El clasificador pondera las etiquetas devueltas por Amazon Rekognition aplicando filtros estrictos contra falsos positivos:
+1. **Prioridad a objetos especificos no reciclables (`NO_RECICLABLE`):** Si Rekognition detecta un objeto como `Plastic Bag`, `Straw`, `Napkin` o `Styrofoam`, le otorga mayor peso (`x1.8`) para asegurar su correcta clasificacion en el bote gris.
+2. **Objetos reciclables especificos (`RECICLABLE`):** Botellas (`Bottle`, `Plastic Bottle`, `Glass Bottle`), latas (`Can`, `Aluminum Can`), carton y cajas limpias (`Cardboard`, `Carton`, `Box`), frascos (`Jar`, `Mason Jar`).
+3. **Materiales genericos (`MATERIALES_GENERICOS`):** Las etiquetas genericas (`Plastic`, `Paper`, `Metal`, `Foil`, `Container`, `Glass`, `Steel`) **no** clasifican como reciclable por si solas. Solo aportan un puntaje complementario leve (`0.3`) si y solo si se identifico previamente un objeto reciclable especifico (por ejemplo, `Plastic Bottle`), evitando que un plastico sucio o desechable no reconocido se marque erroneamente como reciclable.
+4. **Residuos organicos (`ORGANICO`):** Frutas, verduras, restos de comida, plantas y hojas (`Fruit`, `Vegetable`, `Food`, `Plant`, `Bread`, etc.).
+5. **Manejo de imagenes no reconocidas (`no_identificado`):** Si la imagen no contiene etiquetas que coincidan con residuos (o la suma ponderada es 0), el sistema ya no fuerza un falso `no_reciclable` con confianza 0%, sino que devuelve la categoria `no_identificado`, solicitando al usuario acercar o iluminar mejor el objeto.
 
 ### 4. Base de Datos y Almacenamiento
 - **Amazon DynamoDB:** Tabla configurada en modo **Aprovisionado (5 RCU y 5 WCU)** para aprovechar el nivel **Always Free** de AWS (que otorga hasta 25 RCU, 25 WCU y 25 GB de almacenamiento gratis de forma permanente), con clave de particion `imagen_id` (`String`) y limpieza automatica mediante el atributo TTL `ttl` (24 horas).

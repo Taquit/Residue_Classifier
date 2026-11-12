@@ -3,6 +3,12 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   Clasificador Inteligente de Residuos - Arquitectura Serverless con S3, Lambda, Rekognition, DynamoDB y API Gateway.
 
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: Origen permitido para CORS (usa '*' en desarrollo o 'https://tu-distribucion.cloudfront.net' en produccion)
+
 Globals:
   Function:
     Runtime: python3.12
@@ -14,6 +20,7 @@ Globals:
       Variables:
         BUCKET: !Sub "${AWS::StackName}-imagenes-${AWS::AccountId}"
         TABLE: !Ref ResiduosTable
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
 
 Resources:
   # ---------------------------------------------------------------------------
@@ -26,7 +33,7 @@ Resources:
       Cors:
         AllowMethods: "'GET,POST,PUT,OPTIONS'"
         AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        AllowOrigin: "'*'"
+        AllowOrigin: !Sub "'${AllowedOrigin}'"
 
   # ---------------------------------------------------------------------------
   # Bucket S3 para almacenar las fotos temporalmente (con CORS para PUT directo)
@@ -44,7 +51,7 @@ Resources:
               - GET
               - HEAD
             AllowedOrigins:
-              - "*"
+              - !Ref AllowedOrigin
             MaxAge: 3000
       LifecycleConfiguration:
         Rules:
