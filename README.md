@@ -72,6 +72,7 @@ Aplicacion de pagina unica (SPA) sin dependencias externas ni paso de compilacio
 - Soporta captura directa desde camara en dispositivos moviles o arrastrar y soltar archivos (Drag & Drop).
 - Redimensiona y comprime la fotografia en el navegador (Canvas a JPEG) antes de enviarla a S3 para reducir el consumo de datos y acelerar la respuesta.
 - Sube el archivo directamente a Amazon S3 usando la URL prefirmada, evitando el limite de payload de API Gateway y Lambda.
+- Consume la API mediante la ruta relativa `/api` (mismo dominio de CloudFront), sin campos de configuracion visibles.
 - Realiza consultas periodicas (*polling*) al endpoint `/resultado` hasta obtener el dictamen.
 - Maneja estados visuales dedicados para las tres categorias de residuos, asi como la tarjeta ambar de **"No identificado"** cuando la foto no contenga un residuo reconocible.
 
@@ -141,4 +142,4 @@ sam deploy
 aws s3 sync frontend/ s3://<FrontendBucketName>/
 ```
 
-Los `Outputs` muestran `FrontendUrl`, un enlace listo para compartir que ya incluye la URL del API. Guia completa (requisitos, parametros, limpieza y problemas comunes): [despliegue-sam.md](./despliegue-sam.md)
+Los `Outputs` muestran `FrontendUrl`, el enlace HTTPS listo para compartir. CloudFront sirve el frontend y enruta `/api/*` a API Gateway bajo el mismo dominio, por lo que la URL de la API no se expone en la interfaz. Guia completa (requisitos, parametros, limpieza y problemas comunes): [despliegue-sam.md](./despliegue-sam.md)

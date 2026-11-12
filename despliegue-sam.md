@@ -10,7 +10,7 @@ Despliega **todo el proyecto con comandos**: backend (API Gateway, 3 Lambdas, S3
 | `PresignFunction`, `AnalizarFunction`, `ResultadoFunction` | Las 3 Lambdas (Python 3.12) |
 | `ImagenesBucket` | Bucket de fotos (CORS para PUT, expiracion a 1 dia, trigger a `AnalizarFunction`) |
 | `ResiduosTable` | DynamoDB provisionado 5 RCU / 5 WCU con TTL |
-| `FrontendBucket` + `FrontendDistribution` | Bucket privado del frontend servido por CloudFront (HTTPS, necesario para usar la camara del celular) |
+| `FrontendBucket` + `FrontendDistribution` | Bucket privado del frontend servido por CloudFront (HTTPS, necesario para usar la camara del celular). Tambien enruta `/api/*` hacia API Gateway mediante una CloudFront Function que quita el prefijo `/api` |
 
 ## Requisitos
 
@@ -47,11 +47,9 @@ aws cloudformation describe-stacks --stack-name clasificador-residuos \
 
 ## Compartir la aplicacion
 
-El output `FrontendUrl` es el enlace listo para compartir. Ya incluye el parametro `?api=<ApiUrl>`, asi que el frontend se autoconfigura y los usuarios no tienen que pegar la URL del API:
+El output `FrontendUrl` es el enlace listo para compartir (`https://<id>.cloudfront.net/`). No hay que configurar nada: CloudFront sirve el frontend en `/` y reenvia `/api/*` a API Gateway bajo el mismo dominio, asi que el frontend llama a la ruta relativa `/api` y la URL de API Gateway no aparece en la pagina ni en el enlace.
 
-```
-https://<id>.cloudfront.net/?api=https://<api-id>.execute-api.<region>.amazonaws.com/prod
-```
+> La URL directa de API Gateway (output `ApiUrl`) sigue existiendo y es publica; simplemente no se muestra a los usuarios.
 
 Prueba el enlace desde un celular antes de compartirlo: debe pedir permiso de camara y devolver un resultado tras subir una foto.
 
@@ -59,7 +57,7 @@ Prueba el enlace desde un celular antes de compartirlo: debe pedir permiso de ca
 
 | Parametro | Default | Descripcion |
 |---|---|---|
-| `AllowedOrigin` | `*` | Origen permitido para CORS (API y bucket de fotos). |
+| `AllowedOrigin` | `*` | Origen permitido para CORS del bucket de fotos y de la URL directa de la API. El frontend usa el mismo dominio para la API, por lo que no se necesita CORS ahi. |
 
 Para restringirlo al dominio de CloudFront tras el primer despliegue:
 
