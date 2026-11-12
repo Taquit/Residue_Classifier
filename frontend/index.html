@@ -373,15 +373,6 @@
     </header>
 
     <div class="card">
-      <div class="config-bar">
-        <label for="apiUrl">URL base de API Gateway</label>
-        <input
-          type="url"
-          id="apiUrl"
-          placeholder="https://xxxx.execute-api.us-east-1.amazonaws.com/prod"
-          autocomplete="off"
-        />
-      </div>
 
       <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Seleccionar o arrastrar imagen">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
@@ -449,8 +440,8 @@
 
   <script>
     (function () {
-      const STORAGE_KEY = "clasificador_residuos_api_url";
-      const apiUrlInput = document.getElementById("apiUrl");
+      // La API se sirve bajo el mismo dominio (CloudFront /api/*)
+      const API_BASE = "/api";
       const dropzone = document.getElementById("dropzone");
       const fileInput = document.getElementById("fileInput");
       const cameraInput = document.getElementById("cameraInput");
@@ -469,24 +460,6 @@
       const tagsList = document.getElementById("tagsList");
 
       let preparedBlob = null;
-
-      // Cargar URL guardada o parametro ?api=
-      const urlParams = new URLSearchParams(window.location.search);
-      const savedUrl = urlParams.get("api") || localStorage.getItem(STORAGE_KEY) || "";
-      if (savedUrl) {
-        apiUrlInput.value = savedUrl;
-      }
-      apiUrlInput.addEventListener("change", () => {
-        localStorage.setItem(STORAGE_KEY, apiUrlInput.value.trim().replace(/\/+$/, ""));
-      });
-
-      function getBaseApiUrl() {
-        const val = apiUrlInput.value.trim().replace(/\/+$/, "");
-        if (val) {
-          localStorage.setItem(STORAGE_KEY, val);
-        }
-        return val;
-      }
 
       // Comprime y normaliza cualquier imagen a JPEG (max 1280px) para envio rapido desde celular o laptop
       function normalizeImageToJpeg(file) {
@@ -652,12 +625,7 @@
       }
 
       btnAnalyze.addEventListener("click", async () => {
-        const baseUrl = getBaseApiUrl();
-        if (!baseUrl) {
-          showError("Ingresa primero la URL base de tu API Gateway en el campo superior.");
-          apiUrlInput.focus();
-          return;
-        }
+        const baseUrl = API_BASE;
         if (!preparedBlob) {
           showError("Selecciona o toma una foto antes de clasificar.");
           return;
