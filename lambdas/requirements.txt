@@ -1,0 +1,1 @@
+# boto3 y botocore estan incluidos de forma nativa en el runtime de AWS Lambda (Python 3.12)

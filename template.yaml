@@ -36,6 +36,62 @@ Resources:
         AllowOrigin: !Sub "'${AllowedOrigin}'"
 
   # ---------------------------------------------------------------------------
+  # Frontend publico: bucket S3 privado + CloudFront (HTTPS, necesario para la camara del celular)
+  # ---------------------------------------------------------------------------
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-frontend-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  FrontendOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-frontend-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: frontend-s3
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt FrontendOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: frontend-s3
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          Compress: true
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}"
+
+  # ---------------------------------------------------------------------------
   # Bucket S3 para almacenar las fotos temporalmente (con CORS para PUT directo)
   # ---------------------------------------------------------------------------
   ImagenesBucket:
@@ -153,6 +209,12 @@ Resources:
             Method: get
 
 Outputs:
+  FrontendUrl:
+    Description: URL publica (HTTPS) de la aplicacion; compartela con los asistentes
+    Value: !Sub "https://${FrontendDistribution.DomainName}/?api=https://${ClasificadorApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  FrontendBucketName:
+    Description: Bucket donde se sube el frontend (aws s3 sync frontend/ s3://<bucket>)
+    Value: !Ref FrontendBucket
   ApiUrl:
     Description: URL base de API Gateway para colocar en el frontend (index.html)
     Value: !Sub "https://${ClasificadorApi}.execute-api.${AWS::Region}.amazonaws.com/prod"

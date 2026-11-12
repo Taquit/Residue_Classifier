@@ -56,6 +56,8 @@ sequenceDiagram
 │   ├── analizar.py              # Lambda #2: Trigger S3 -> Rekognition -> DynamoDB
 │   └── resultado.py             # Lambda #3: Consulta resultado en DynamoDB (GET /resultado)
 ├── template.yaml                # Plantilla de infraestructura AWS SAM (CloudFormation)
+├── samconfig.toml               # Configuracion de `sam deploy` (stack, region, capabilities)
+├── despliegue-sam.md            # Guia de despliegue automatizado con SAM (recomendada)
 ├── despliegue-consola.md        # Guia paso a paso desde la consola de AWS (sin CloudFront)
 ├── despliegue-cloudfront.md     # Guia paso a paso con Amazon CloudFront y OAC (HTTPS)
 └── README.md                    # Documentacion general del proyecto
@@ -130,13 +132,13 @@ Ideal para laboratorios, pruebas rapidas y aprendizaje directo en la interfaz we
 Ideal para entornos productivos donde el bucket del frontend se mantiene 100% privado mediante Origin Access Control (OAC) y se sirve bajo HTTPS con baja latencia.
 - Consulta la guia detallada en: [despliegue-cloudfront.md](./despliegue-cloudfront.md)
 
-### Opcion C: Despliegue Automatizado con AWS SAM CLI
-Si dispones de AWS CLI y AWS SAM CLI configurados en tu terminal, puedes desplegar todo el backend con `template.yaml`:
+### Opcion C: Despliegue Automatizado con AWS SAM CLI (Recomendada)
+Un solo flujo de comandos crea backend **y** frontend publico en HTTPS (S3 privado + CloudFront):
 
 ```bash
-sam build
-sam deploy --guided
+sam build --use-container     # o `sam build` si tienes Python 3.12
+sam deploy
+aws s3 sync frontend/ s3://<FrontendBucketName>/
 ```
 
-Al finalizar el despliegue con SAM, la terminal mostrara en los `Outputs` el valor de `ApiUrl`, el cual puedes colocar directamente en la interfaz web `frontend/index.html`.
-# Residue_Classifier
+Los `Outputs` muestran `FrontendUrl`, un enlace listo para compartir que ya incluye la URL del API. Guia completa (requisitos, parametros, limpieza y problemas comunes): [despliegue-sam.md](./despliegue-sam.md)
